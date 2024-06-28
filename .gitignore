@@ -1,0 +1,5 @@
+# Ignore all pickle files
+*.pkl
+
+# Ignore temporary files
+/tmp/
