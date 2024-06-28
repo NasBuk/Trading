@@ -15,7 +15,7 @@ DEFAULT_PAIR = 'BTCUSDT'
 DEFAULT_INTERVAL = '1m'
 DEFAULT_START_DATE = '2017-07-14'
 RATE_LIMIT_SLEEP = 0.2
-TIME_BEFORE_SAVE = 120  # Time before saving in seconds
+TIME_BEFORE_SAVE = 300  # Time before saving in seconds
 
 def fetch_klines(pair, interval, start_time, end_time):
     """Fetches kline (candlestick) data from the Binance API."""
@@ -50,20 +50,15 @@ def load_data(filename):
 def get_initial_start_time(filename, start_date):
     """Gets the initial start time based on existing data or a default start date."""
     if os.path.exists(filename):
-        logging.info('Data file exists, loading data...')
-        df = load_data(filename)
-        last_timestamp = int(df.iloc[-1]['Open time'].timestamp() * 1000)
-        start_time = last_timestamp + 60000
+        logging.info('Data file exists, loading last row to get the latest timestamp...')
+        with open(filename, 'rb') as file:
+            last_row = pd.read_pickle(file).tail(1)
+        last_timestamp = pd.Timestamp(last_row['Open time'].values[0]).timestamp() * 1000
+        start_time = int(last_timestamp + 60000)
     else:
         logging.info('Data file does not exist, downloading all available historical data...')
         start_time = int(datetime.datetime.strptime(start_date, '%Y-%m-%d').timestamp() * 1000)
     return start_time
-
-def calculate_klines_per_save(time_before_save, rate_limit_sleep, klines_per_request=1000):
-    """Calculate the number of klines to fetch before saving based on the time before saving."""
-    requests_per_save = time_before_save / rate_limit_sleep
-    klines_per_save = requests_per_save * klines_per_request
-    return int(klines_per_save)
 
 def convert_data_types(df):
     """Convert data types of specific columns."""
@@ -85,8 +80,6 @@ def main(pair, interval, start_date):
     start_time = get_initial_start_time(filename, start_date)
     end_time = int(datetime.datetime.now().timestamp() * 1000)
 
-    klines_before_save = calculate_klines_per_save(TIME_BEFORE_SAVE, RATE_LIMIT_SLEEP)
-
     # Print main parameters
     print(f"\n{'='*40}\nStarting Data Fetch\n{'='*40}")
     print(f"Currency Pair: {pair}")
@@ -106,7 +99,6 @@ def main(pair, interval, start_date):
     try:
         with tqdm(total=total_requests, desc="Fetching klines") as pbar:
             while start_time < end_time:
-                iteration_start_time = time()
                 klines = fetch_klines(pair, interval, start_time, end_time)
                 if klines is None:
                     logging.error('Failed to fetch klines, exiting.')
@@ -133,23 +125,14 @@ def main(pair, interval, start_date):
 
                     if os.path.exists(filename):
                         df = load_data(filename)
-                        # Convert data types of the existing data
-                        df = convert_data_types(df)
                         df = pd.concat([df, new_df], ignore_index=True)
                     else:
                         df = new_df
 
                     save_data(df, filename)
+                    del df
                     all_klines = []  # reset buffer
                     start_loop_time = time()  # reset the timer
-
-                iteration_end_time = time()
-                total_iteration_time = iteration_end_time - iteration_start_time
-
-                # Adjust the RATE_LIMIT_SLEEP to more accurately reflect total time taken
-                sleep_adjustment = RATE_LIMIT_SLEEP - total_iteration_time
-                if sleep_adjustment > 0:
-                    sleep(sleep_adjustment)
 
     except KeyboardInterrupt:
         logging.warning('KeyboardInterrupt received, saving progress...')
@@ -168,13 +151,12 @@ def main(pair, interval, start_date):
 
         if os.path.exists(filename):
             df = load_data(filename)
-            # Convert data types of the existing data
-            df = convert_data_types(df)
             df = pd.concat([df, new_df], ignore_index=True)
         else:
             df = new_df
 
         save_data(df, filename)
+        del df
 
     df = load_data(filename)
     print(df[['Open time', 'Open', 'High', 'Low', 'Close']].head())
