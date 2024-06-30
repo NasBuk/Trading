@@ -16,6 +16,10 @@ DEFAULT_INTERVAL = '1m'
 DEFAULT_START_DATE = '2017-07-14'
 RATE_LIMIT_SLEEP = 0.2
 TIME_BEFORE_SAVE = 300  # Time before saving in seconds
+COLUMNS = ['Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
+            'Close time', 'Quote asset volume', 'Number of trades',
+            'Taker buy base asset volume', 'Taker buy quote asset volume',
+            'Ignore']
 
 def fetch_klines(pair, interval, start_time, end_time):
     """Fetches kline (candlestick) data from the Binance API."""
@@ -115,10 +119,7 @@ def main(pair, interval, start_date):
 
                 # Check if the save interval has been exceeded
                 if (time() - start_loop_time) >= TIME_BEFORE_SAVE:
-                    new_df = pd.DataFrame(all_klines, columns=['Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
-                                                               'Close time', 'Quote asset volume', 'Number of trades',
-                                                               'Taker buy base asset volume', 'Taker buy quote asset volume',
-                                                               'Ignore'])
+                    new_df = pd.DataFrame(all_klines, columns=COLUMNS)
 
                     # Convert data types of the new data
                     new_df = convert_data_types(new_df)
@@ -141,10 +142,7 @@ def main(pair, interval, start_date):
 
     # Save any remaining klines
     if len(all_klines) > 0:
-        new_df = pd.DataFrame(all_klines, columns=['Open time', 'Open', 'High', 'Low', 'Close', 'Volume',
-                                                   'Close time', 'Quote asset volume', 'Number of trades',
-                                                   'Taker buy base asset volume', 'Taker buy quote asset volume',
-                                                   'Ignore'])
+        new_df = pd.DataFrame(all_klines, columns=COLUMNS)
 
         # Convert data types of the new data
         new_df = convert_data_types(new_df)
